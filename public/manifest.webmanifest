@@ -1,0 +1,11 @@
+{
+  "name": "Tasks",
+  "short_name": "Tasks",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#edf3f4",
+  "theme_color": "#087ea8",
+  "icons": [
+    { "src": "/taskappicon.png", "sizes": "1254x1254", "type": "image/png", "purpose": "any maskable" }
+  ]
+}

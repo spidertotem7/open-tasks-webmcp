@@ -1,0 +1,109 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function memberPath(uid) { return /databases/$(database)/documents/members/$(uid); }
+    function definitionPath(id) { return /databases/$(database)/documents/recurring_tasks/$(id); }
+    function active() { return request.auth != null && exists(memberPath(request.auth.uid)) && get(memberPath(request.auth.uid)).data.active == true; }
+    function household() { return get(memberPath(request.auth.uid)).data.household_id; }
+    function ownHousehold(data) { return active() && data.household_id == household(); }
+    function householdMember(uid) { return exists(memberPath(uid)) && get(memberPath(uid)).data.active == true && get(memberPath(uid)).data.household_id == household(); }
+    function validAssignees(values) {
+      return values is list && values.size() <= 2 &&
+        (values.size() == 0 || householdMember(values[0])) &&
+        (values.size() < 2 || householdMember(values[1]));
+    }
+    function validAssignment(data) {
+      return data.assignment_type in ['member', 'household'] && validAssignees(data.assignee_uids) &&
+        ((data.assignment_type == 'member' && data.assignee_uids.size() == 1) ||
+         (data.assignment_type == 'household' && data.assignee_uids.size() == 2));
+    }
+    function validCompletion(data) {
+      return (data.status == 'completed' && data.completed_at is timestamp && data.completed_by_uid is string && householdMember(data.completed_by_uid) && data.completed_by_name is string) ||
+        (data.status != 'completed' && data.completed_at == null && data.completed_by_uid == null && data.completed_by_name == null);
+    }
+    function taskParticipant(task) { return ownHousehold(task) && (task.created_by_uid == request.auth.uid || request.auth.uid in task.assignee_uids); }
+    function definitionParticipant(definition) { return ownHousehold(definition) && (definition.created_by_uid == request.auth.uid || request.auth.uid in definition.assignee_uids); }
+    function timestamps() { return request.resource.data.created_at is timestamp && request.resource.data.updated_at == request.time; }
+    function createTime() { return timestamps() && request.resource.data.created_at == request.time; }
+    function updateTime() { return timestamps() && request.resource.data.created_at == resource.data.created_at; }
+    function validTask() {
+      return request.resource.data.keys().hasAll(['household_id','title','description','category_id','status','priority','due_date','due_time','assignment_type','assignee_uids','created_by_uid','created_by_name','created_at','updated_at','completed_at','completed_by_uid','completed_by_name','recurrence','recurrence_key']) &&
+        !request.resource.data.keys().hasAny(['drive_link']) &&
+        request.resource.data.title is string && request.resource.data.title.size() > 0 && request.resource.data.title.size() <= 200 &&
+        request.resource.data.description is string && request.resource.data.description.size() <= 10000 &&
+        request.resource.data.status in ['not_started','in_progress','waiting','completed'] &&
+        request.resource.data.priority in ['high','medium','low'] &&
+        (request.resource.data.due_date == null || request.resource.data.due_date is string) &&
+        (request.resource.data.due_time == null || request.resource.data.due_time is string) &&
+        validAssignment(request.resource.data) &&
+        request.resource.data.created_by_uid is string && request.resource.data.created_by_name is string &&
+        validCompletion(request.resource.data) &&
+        request.resource.data.recurrence is map && request.resource.data.recurrence_key is string &&
+        (!request.resource.data.keys().hasAny(['recurring_definition_id']) || request.resource.data.recurring_definition_id == null || request.resource.data.recurring_definition_id is string) &&
+        (!request.resource.data.keys().hasAny(['occurrence_due_date']) || request.resource.data.occurrence_due_date == null || request.resource.data.occurrence_due_date is string);
+    }
+    function validDefinition() {
+      return request.resource.data.keys().hasAll(['household_id','title','description','category_id','priority','due_time','assignment_type','assignee_uids','created_by_uid','created_by_name','schedule','active','next_due_date','current_occurrence_id','last_completed_at','last_completed_occurrence_id','created_at','updated_at']) &&
+        !request.resource.data.keys().hasAny(['drive_link']) &&
+        request.resource.data.title is string && request.resource.data.title.size() > 0 && request.resource.data.title.size() <= 200 &&
+        request.resource.data.description is string && request.resource.data.description.size() <= 10000 &&
+        request.resource.data.priority in ['high','medium','low'] &&
+        (request.resource.data.due_time == null || request.resource.data.due_time is string) &&
+        validAssignment(request.resource.data) &&
+        request.resource.data.created_by_uid is string && request.resource.data.created_by_name is string &&
+        request.resource.data.schedule is map && request.resource.data.active is bool &&
+        (request.resource.data.next_due_date == null || request.resource.data.next_due_date is string) &&
+        (request.resource.data.current_occurrence_id == null || request.resource.data.current_occurrence_id is string) &&
+        (request.resource.data.last_completed_at == null || request.resource.data.last_completed_at is timestamp) &&
+        (request.resource.data.last_completed_occurrence_id == null || request.resource.data.last_completed_occurrence_id is string);
+    }
+    function generatedOccurrence(data) {
+      return data.recurring_definition_id is string &&
+        existsAfter(definitionPath(data.recurring_definition_id)) &&
+        definitionParticipant(getAfter(definitionPath(data.recurring_definition_id)).data) &&
+        data.created_by_uid == getAfter(definitionPath(data.recurring_definition_id)).data.created_by_uid &&
+        data.assignment_type == getAfter(definitionPath(data.recurring_definition_id)).data.assignment_type &&
+        data.assignee_uids == getAfter(definitionPath(data.recurring_definition_id)).data.assignee_uids;
+    }
+    function validCategory() { return request.resource.data.name is string && request.resource.data.name.size() > 0 && request.resource.data.name.size() <= 80 && request.resource.data.position is int && request.resource.data.archived is bool && request.resource.data.visible_to_uids.size() > 0 && validAssignees(request.resource.data.visible_to_uids); }
+
+    match /households/{id} { allow read: if active() && id == household(); allow write: if false; }
+    match /members/{uid} { allow read: if active() && resource.data.household_id == household(); allow write: if false; }
+    match /categories/{id} {
+      allow read: if ownHousehold(resource.data) && request.auth.uid in resource.data.visible_to_uids;
+      allow create: if ownHousehold(request.resource.data) && request.auth.uid in request.resource.data.visible_to_uids && validCategory() && createTime();
+      allow update: if ownHousehold(resource.data) && request.auth.uid in resource.data.visible_to_uids && ownHousehold(request.resource.data) && request.auth.uid in request.resource.data.visible_to_uids && validCategory() && updateTime();
+      allow delete: if false;
+    }
+    match /recurring_tasks/{id} {
+      allow read: if definitionParticipant(resource.data);
+      allow create: if ownHousehold(request.resource.data) && request.resource.data.created_by_uid == request.auth.uid && validDefinition() && createTime();
+      allow update: if definitionParticipant(resource.data) && ownHousehold(request.resource.data) && request.resource.data.created_by_uid == resource.data.created_by_uid && request.resource.data.created_by_name == resource.data.created_by_name && validDefinition() && updateTime();
+      allow delete: if definitionParticipant(resource.data);
+    }
+    match /tasks/{id} {
+      allow read: if taskParticipant(resource.data);
+      allow create: if ownHousehold(request.resource.data) && validTask() && createTime() && (request.resource.data.created_by_uid == request.auth.uid || generatedOccurrence(request.resource.data));
+      allow update: if taskParticipant(resource.data) && ownHousehold(request.resource.data) && request.resource.data.created_by_uid == resource.data.created_by_uid && request.resource.data.created_by_name == resource.data.created_by_name && validTask() && updateTime();
+      allow delete: if taskParticipant(resource.data);
+      match /comments/{commentId} {
+        allow read: if taskParticipant(get(/databases/$(database)/documents/tasks/$(id)).data);
+        allow create: if taskParticipant(get(/databases/$(database)/documents/tasks/$(id)).data) && request.resource.data.author_uid == request.auth.uid && request.resource.data.body is string && request.resource.data.body.size() > 0 && request.resource.data.created_at == request.time;
+        allow update: if false;
+        allow delete: if taskParticipant(get(/databases/$(database)/documents/tasks/$(id)).data);
+      }
+      match /subtasks/{subtaskId} {
+        allow read: if taskParticipant(get(/databases/$(database)/documents/tasks/$(id)).data);
+        allow create: if taskParticipant(get(/databases/$(database)/documents/tasks/$(id)).data) && request.resource.data.title is string && request.resource.data.title.size() > 0 && request.resource.data.completed is bool && request.resource.data.created_at == request.time && request.resource.data.updated_at == request.time;
+        allow update: if taskParticipant(get(/databases/$(database)/documents/tasks/$(id)).data) && request.resource.data.created_at == resource.data.created_at && request.resource.data.updated_at == request.time;
+        allow delete: if taskParticipant(get(/databases/$(database)/documents/tasks/$(id)).data);
+      }
+      match /activity/{activityId} {
+        allow read: if taskParticipant(get(/databases/$(database)/documents/tasks/$(id)).data);
+        allow create: if taskParticipant(get(/databases/$(database)/documents/tasks/$(id)).data) && request.resource.data.author_uid == request.auth.uid && request.resource.data.created_at == request.time;
+        allow update, delete: if false;
+      }
+    }
+    match /{document=**} { allow read, write: if false; }
+  }
+}

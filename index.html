@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#edf3f4" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#06101d" media="(prefers-color-scheme: dark)" />
+    <script>
+      (() => {
+        try {
+          const preference = localStorage.getItem('task-hub-theme') || 'system'
+          const deviceIsDark = window.matchMedia('(prefers-color-scheme: dark)').matches
+          const dark = preference === 'system' ? deviceIsDark : preference === 'dark'
+          document.documentElement.dataset.theme = dark ? 'dark' : 'light'
+          document.documentElement.style.colorScheme = dark ? 'dark' : 'light'
+        } catch {
+          const dark = window.matchMedia('(prefers-color-scheme: dark)').matches
+          document.documentElement.dataset.theme = dark ? 'dark' : 'light'
+          document.documentElement.style.colorScheme = dark ? 'dark' : 'light'
+        }
+      })()
+    </script>
+    <link rel="icon" type="image/png" href="/taskappicon.png" />
+    <link rel="apple-touch-icon" href="/taskappicon.png" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <title>Tasks</title>
+  </head>
+  <body><div id="root"></div><script type="module" src="/src/main.jsx"></script></body>
+</html>

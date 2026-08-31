@@ -1,0 +1,13 @@
+{
+  "indexes": [
+    { "collectionGroup": "recurring_tasks", "queryScope": "COLLECTION", "fields": [{ "fieldPath": "household_id", "order": "ASCENDING" }, { "fieldPath": "created_by_uid", "order": "ASCENDING" }] },
+    { "collectionGroup": "recurring_tasks", "queryScope": "COLLECTION", "fields": [{ "fieldPath": "household_id", "order": "ASCENDING" }, { "fieldPath": "assignee_uids", "arrayConfig": "CONTAINS" }] },
+    { "collectionGroup": "tasks", "queryScope": "COLLECTION", "fields": [{ "fieldPath": "household_id", "order": "ASCENDING" }, { "fieldPath": "created_by_uid", "order": "ASCENDING" }] },
+    { "collectionGroup": "tasks", "queryScope": "COLLECTION", "fields": [{ "fieldPath": "household_id", "order": "ASCENDING" }, { "fieldPath": "assignee_uids", "arrayConfig": "CONTAINS" }] },
+    { "collectionGroup": "tasks", "queryScope": "COLLECTION", "fields": [{ "fieldPath": "household_id", "order": "ASCENDING" }, { "fieldPath": "status", "order": "ASCENDING" }, { "fieldPath": "due_date", "order": "ASCENDING" }] },
+    { "collectionGroup": "tasks", "queryScope": "COLLECTION", "fields": [{ "fieldPath": "household_id", "order": "ASCENDING" }, { "fieldPath": "assignee_uids", "arrayConfig": "CONTAINS" }, { "fieldPath": "due_date", "order": "ASCENDING" }] },
+    { "collectionGroup": "tasks", "queryScope": "COLLECTION", "fields": [{ "fieldPath": "household_id", "order": "ASCENDING" }, { "fieldPath": "category_id", "order": "ASCENDING" }, { "fieldPath": "due_date", "order": "ASCENDING" }] },
+    { "collectionGroup": "categories", "queryScope": "COLLECTION", "fields": [{ "fieldPath": "household_id", "order": "ASCENDING" }, { "fieldPath": "visible_to_uids", "arrayConfig": "CONTAINS" }] }
+  ],
+  "fieldOverrides": []
+}
