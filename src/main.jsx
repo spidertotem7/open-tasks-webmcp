@@ -7,7 +7,7 @@ import { dateString, nextDueDate, occurrenceId, recurrenceUrgency } from './lib/
 import { assignmentType, isActiveTask, isAssignedToMe, isCalendarTask, isCounterpartTask, isHomeCategory, isHomeViewTask, isMyTask, isPrimaryTask, isVisibleOccurrence } from './lib/taskVisibility'
 import { buildTaskContext, filterTasks, isValidDateString, resolveAssignee, resolveCategory, taskSummary, validateBatchUpdates, validateTaskPatch } from './lib/webmcpCore'
 import { registerTaskTools, toolResult } from './lib/webmcp'
-import { DEMO_ACTIVE_KEY, DEMO_STORAGE_KEY, freshDemoWorkspace, loadDemoWorkspace, saveDemoWorkspace } from './lib/demoWorkspace'
+import { DEMO_ACTIVE_KEY, freshDemoWorkspace, loadDemoWorkspace, saveDemoWorkspace } from './lib/demoWorkspace'
 import './styles.css'
 
 const categoriesSeed = ['Home', 'Pets', 'Garden', 'Personal', 'Errands']
@@ -280,6 +280,7 @@ function App() {
 
   useEffect(() => {
     if (!user?.member) { webmcpRuntime.current = null; return }
+    // Keep tool handlers on current state without re-registering the six tools after every render.
     const workspace = deriveWorkspaceView({ tasks, categories, members, user, view, filters })
     const validSelectedTaskIds = selectedTaskIds.filter(id => workspace.activeTasks.some(task => task.id === id))
     webmcpRuntime.current = {
@@ -496,7 +497,7 @@ function App() {
 
   function resetDemo() {
     const workspace = freshDemoWorkspace()
-    localStorage.setItem(DEMO_STORAGE_KEY, JSON.stringify(workspace))
+    saveDemoWorkspace(workspace)
     setTasks(workspace.tasks)
     setDefinitions(workspace.definitions)
     setCategories(workspace.categories)
@@ -540,10 +541,7 @@ function App() {
 
   async function createFromAgent(input) {
     if (!input.title?.trim() || input.title.trim().length > 200) throw new Error('Title must be between 1 and 200 characters.')
-    if (String(input.description || '').length > 10000) throw new Error('Description cannot exceed 10,000 characters.')
-    if (input.due_date && !isValidDateString(input.due_date)) throw new Error('due_date must use YYYY-MM-DD and be a real calendar date.')
-    if (input.priority && !['high', 'medium', 'low'].includes(input.priority)) throw new Error('Priority must be high, medium, or low.')
-    if (input.status && !['not_started', 'in_progress', 'waiting'].includes(input.status)) throw new Error('Use complete_task to create completion history.')
+    validateTaskPatch(input)
     const categoryId = input.category === undefined ? filters.category : resolveCategory(input.category, categories)
     const assignmentTarget = input.assignee === undefined ? user.uid : resolveAssignee(input.assignee, user, members)
     const id = await saveTask({ title: input.title.trim(), description: input.description || '', category_id: categoryId || '', status: input.status || 'not_started', priority: input.priority || 'medium', due_date: input.due_date || '', assignment_target: assignmentTarget, completion_date: '', completed_by_uid: user.uid, recurrence: {} })

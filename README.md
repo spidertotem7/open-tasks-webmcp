@@ -61,6 +61,7 @@ The no-login demo works without Firebase configuration. For the private authenti
 ```powershell
 npm run lint
 npm test
+npm run test:e2e
 npm run test:rules
 npm run build
 ```
