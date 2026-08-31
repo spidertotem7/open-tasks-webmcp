@@ -131,14 +131,15 @@ function TaskForm({ task, categories, members, userId, onClose, onSave }) {
 
   async function submit(event) {
     event.preventDefault()
+    const submittedForm = { ...form, due_date: event.currentTarget.elements.due_date.value }
     setError('')
-    if (!form.assignment_target) return setError('Choose Yanely, Jordan, or Household.')
-    if (form.status === 'completed' && !form.completion_date) return setError('Choose when the task was completed.')
-    if (form.status === 'completed' && !members.some(member => member.id === form.completed_by_uid)) return setError('Choose who completed the task.')
-    if (form.recurrence.frequency && !form.due_date) return setError('Choose a due date for a recurring task.')
-    if (form.recurrence.frequency === 'custom' && Number(form.recurrence.interval) < 1) return setError('The repeat interval must be at least one day.')
+    if (!submittedForm.assignment_target) return setError('Choose Yanely, Jordan, or Household.')
+    if (submittedForm.status === 'completed' && !submittedForm.completion_date) return setError('Choose when the task was completed.')
+    if (submittedForm.status === 'completed' && !members.some(member => member.id === submittedForm.completed_by_uid)) return setError('Choose who completed the task.')
+    if (submittedForm.recurrence.frequency && !submittedForm.due_date) return setError('Choose a due date for a recurring task.')
+    if (submittedForm.recurrence.frequency === 'custom' && Number(submittedForm.recurrence.interval) < 1) return setError('The repeat interval must be at least one day.')
     setBusy(true)
-    try { await onSave(form) }
+    try { await onSave(submittedForm) }
     catch (failure) { setError(failure.message) }
     finally { setBusy(false) }
   }
@@ -153,7 +154,7 @@ function TaskForm({ task, categories, members, userId, onClose, onSave }) {
       <label>Assigned to<select value={form.assignment_target} onChange={event => set('assignment_target', event.target.value)} required>{members.map(member => <option value={member.id} key={member.id}>{member.display_name}</option>)}<option value="household">Household</option></select></label>
       <label>Priority<select value={form.priority} onChange={event => set('priority', event.target.value)}>{['high', 'medium', 'low'].map(item => <option key={item} value={item}>{label(item)}</option>)}</select></label>
       {!form.recurrence.frequency && !statuslessCategory && <label>Status<select value={form.status} onChange={event => set('status', event.target.value)}>{statuses.map(item => <option key={item} value={item}>{label(item)}</option>)}</select></label>}
-      <label className="due-date-field">Due date<input type="date" value={form.due_date} onChange={event => set('due_date', event.target.value)} /></label>
+      <label className="due-date-field">Due date<input name="due_date" type="date" value={form.due_date} onInput={event => set('due_date', event.currentTarget.value)} onChange={event => set('due_date', event.currentTarget.value)} /></label>
       <label>Repeat<select value={form.recurrence.frequency || ''} onChange={event => set('recurrence', { ...form.recurrence, frequency: event.target.value })}><option value="">Does not repeat</option><option value="daily">Daily</option><option value="weekly">Weekly / selected weekdays</option><option value="custom">Every X days</option><option value="monthly">Monthly</option><option value="yearly">Yearly</option></select></label>
     </div>
     {form.status === 'completed' && <fieldset className="completion-edit"><legend>Completion history</legend><div className="completion-edit-grid"><label>Completed on<input type="date" max={dateString()} value={form.completion_date} onChange={event => set('completion_date', event.target.value)} required /></label><label>Completed by<select value={form.completed_by_uid} onChange={event => set('completed_by_uid', event.target.value)}>{members.map(member => <option value={member.id} key={member.id}>{member.display_name}</option>)}</select></label></div></fieldset>}

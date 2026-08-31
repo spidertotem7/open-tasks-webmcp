@@ -10,6 +10,7 @@
     "test:recurrence": "node --test tests/recurrence.test.mjs",
     "test:visibility": "node --test tests/task-visibility.test.mjs",
     "test:webmcp": "node --test tests/webmcp.test.mjs",
+    "test:e2e": "playwright test",
     "test": "node --test tests/recurrence.test.mjs tests/task-visibility.test.mjs tests/webmcp.test.mjs",
     "test:rules": "firebase emulators:exec --only firestore \"node --test tests/firestore-rules.test.mjs\"",
     "preview": "vite preview"
@@ -22,6 +23,7 @@
   "devDependencies": {
     "@eslint/js": "^9.39.4",
     "@firebase/rules-unit-testing": "^5.0.1",
+    "@playwright/test": "^1.62.1",
     "@vitejs/plugin-react": "^6.0.1",
     "eslint": "^9.39.4",
     "eslint-plugin-react-hooks": "^7.1.1",
