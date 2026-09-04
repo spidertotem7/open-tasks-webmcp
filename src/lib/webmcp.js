@@ -1,4 +1,4 @@
-import { ACTIVE_TASK_STATUSES, TASK_PRIORITIES, TASK_STATUSES, WEBMCP_BATCH_LIMIT } from './webmcpCore'
+import { ACTIVE_TASK_STATUSES, TASK_PRIORITIES, TASK_STATUSES, WEBMCP_BATCH_LIMIT } from './webmcpCore.js'
 
 const dateSchema = { type: ['string', 'null'], description: 'Calendar date in YYYY-MM-DD format, or null to remove the due date.' }
 const assigneeSchema = { type: 'string', description: 'Use "me", "other", "household", an active member ID, or an exact active member name.' }
@@ -123,7 +123,7 @@ export const webmcpToolDefinitions = [
 ]
 
 export async function registerTaskTools({ getContext, listTasks, createTask, updateTask, completeTask, batchUpdateTasks, onDebug }) {
-  // navigator.modelContext supports older challenge browser builds; new browsers use document.modelContext.
+  // Keep the legacy navigator location as a narrow compatibility fallback.
   const modelContext = document.modelContext || navigator.modelContext
   if (!modelContext?.registerTool) {
     onDebug?.({ available: false, registered: [], error: 'WebMCP is not available in this browser.' })

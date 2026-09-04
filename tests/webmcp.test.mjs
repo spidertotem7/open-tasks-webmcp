@@ -1,6 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { buildTaskContext, filterTasks, isValidDateString, resolveAssignee, resolveCategory, validateBatchUpdates, validateTaskPatch, WEBMCP_BATCH_LIMIT } from '../src/lib/webmcpCore.js'
+import { registerTaskTools, toolResult, webmcpToolDefinitions } from '../src/lib/webmcp.js'
 
 const categories = [{ id: 'personal', name: 'Personal', archived: false }, { id: 'errands', name: 'Errands', archived: false }]
 const members = [{ id: 'yanely', display_name: 'Yanely' }, { id: 'jordan', display_name: 'Jordan' }]
@@ -65,4 +66,49 @@ test('page context reports current view, filters, and selected task IDs', () => 
   assert.deepEqual(context.filters.category, { id: 'personal', name: 'Personal' })
   assert.deepEqual(context.selected_task_ids, ['one'])
   assert.equal(context.selected_tasks[0].title, 'Record launch trailer')
+})
+
+test('registers all six WebMCP tools and aborts their shared signal on cleanup', async () => {
+  const tools = []
+  const signals = []
+  const originalDocument = globalThis.document
+  Object.defineProperty(globalThis, 'document', {
+    configurable: true,
+    value: {
+      modelContext: {
+        registerTool: async (toolDefinition, options) => {
+          tools.push(toolDefinition)
+          signals.push(options.signal)
+        },
+      },
+    },
+  })
+
+  try {
+    const calls = []
+    const handler = name => async input => {
+      calls.push({ name, input })
+      return toolResult(`${name} succeeded.`, { name })
+    }
+    const unregister = await registerTaskTools({
+      getContext: handler('get_task_context'),
+      listTasks: handler('list_tasks'),
+      createTask: handler('create_task'),
+      updateTask: handler('update_task'),
+      completeTask: handler('complete_task'),
+      batchUpdateTasks: handler('batch_update_tasks'),
+    })
+
+    assert.deepEqual(tools.map(tool => tool.name), webmcpToolDefinitions.map(tool => tool.name))
+    assert.equal(tools.length, 6)
+    const output = await tools.find(tool => tool.name === 'create_task').execute({ title: 'New task' })
+    assert.equal(output.structuredContent.name, 'create_task')
+    assert.deepEqual(calls, [{ name: 'create_task', input: { title: 'New task' } }])
+
+    unregister()
+    assert.equal(signals.every(signal => signal.aborted), true)
+  } finally {
+    if (originalDocument === undefined) delete globalThis.document
+    else Object.defineProperty(globalThis, 'document', { configurable: true, value: originalDocument })
+  }
 })

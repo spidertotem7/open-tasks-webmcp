@@ -7,13 +7,9 @@ import { dateString, nextDueDate, occurrenceId, recurrenceUrgency } from './lib/
 import { assignmentType, isActiveTask, isAssignedToMe, isCalendarTask, isCounterpartTask, isHomeCategory, isHomeViewTask, isMyTask, isPrimaryTask, isVisibleOccurrence } from './lib/taskVisibility'
 import { buildTaskContext, filterTasks, isValidDateString, resolveAssignee, resolveCategory, taskSummary, validateBatchUpdates, validateTaskPatch } from './lib/webmcpCore'
 import { registerTaskTools, toolResult } from './lib/webmcp'
-import { DEMO_ACTIVE_KEY, freshDemoWorkspace, loadDemoWorkspace, saveDemoWorkspace } from './lib/demoWorkspace'
 import './styles.css'
 
 const categoriesSeed = ['Home', 'Pets', 'Garden', 'Personal', 'Errands']
-const demoBootActive = localStorage.getItem(DEMO_ACTIVE_KEY) === 'true'
-const demoBootWorkspace = demoBootActive ? loadDemoWorkspace() : null
-const demoUser = { uid: 'demo-user', member: { household_id: 'webmcp-demo', display_name: 'Demo User' }, demo: true }
 const label = value => value.replaceAll('_', ' ').replace(/\b\w/g, character => character.toUpperCase())
 const dueLabel = value => value ? new Date(`${value}T12:00:00`).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : ''
 const timestampLabel = value => value?.toDate?.().toLocaleString() || 'just now'
@@ -94,7 +90,7 @@ function deriveWorkspaceView({ tasks, categories, members, user, view, filters }
   return { counterpart, visibleCategories, activeCategories, categoryName, toolbarCategories, activeTasks }
 }
 
-function Login({ onDemo }) {
+function Login() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
@@ -109,7 +105,7 @@ function Login({ onDemo }) {
     finally { setBusy(false) }
   }
 
-  return <main className="login"><div><p className="eyebrow">Agent-native task workspace</p><h1>Household tasks, together.</h1><p>One calm place for home, work, and everything in between.</p><form onSubmit={submit}><label>Email<input type="email" value={email} onChange={event => setEmail(event.target.value)} required /></label><label>Password<input type="password" value={password} onChange={event => setPassword(event.target.value)} required /></label>{error && <p role="alert" className="error">{error}</p>}<button disabled={busy}>{busy ? 'Signing in…' : 'Sign in'}</button></form><div className="demo-entry"><span>WebMCP Challenge judge?</span><button type="button" className="quiet" onClick={onDemo}>Open demo workspace</button><small>No account required. Demo data stays in this browser.</small></div></div></main>
+  return <main className="login"><div><p className="eyebrow">Agent-native task workspace</p><h1>Household tasks, together.</h1><p>One calm place for home, work, and everything in between.</p><form onSubmit={submit}><label>Email<input type="email" value={email} onChange={event => setEmail(event.target.value)} required /></label><label>Password<input type="password" value={password} onChange={event => setPassword(event.target.value)} required /></label>{error && <p role="alert" className="error">{error}</p>}<button disabled={busy}>{busy ? 'Signing in…' : 'Sign in'}</button></form></div></main>
 }
 
 function TaskForm({ task, categories, members, userId, onClose, onSave }) {
@@ -177,7 +173,7 @@ function Calendar({ tasks, onSelect }) {
   return <section className="calendar-month"><div className="calendar-head"><button className="quiet" onClick={() => setMonth(new Date(month.getFullYear(), month.getMonth() - 1, 1))} aria-label="Previous month">‹</button><h2>{month.toLocaleString(undefined, { month: 'long', year: 'numeric' })}</h2><button className="quiet" onClick={() => setMonth(new Date(month.getFullYear(), month.getMonth() + 1, 1))} aria-label="Next month">›</button></div><div className="weekdays">{['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => <span key={day}>{day}</span>)}</div><div className="month-grid">{Array.from({ length: first.getDay() }, (_, index) => <span className="calendar-blank" key={`blank-${index}`} />)}{Array.from({ length: days }, (_, index) => { const day = key(index + 1); const due = tasks.filter(task => task.due_date === day); return <button className={`calendar-day ${day === dateString() ? 'today' : ''} ${selectedDate === day ? 'selected' : ''}`} key={day} onClick={() => setSelectedDate(day)}><span>{index + 1}</span>{due.length > 0 && <b className="calendar-flame" aria-label={`${due.length} tasks due`}><img src="/taskappflame-transparent.png" alt="" aria-hidden="true" />{due.length > 1 && <span>{due.length}</span>}</b>}</button> })}</div>{selectedDate && <div className="calendar-tasks"><h3>{new Date(`${selectedDate}T12:00:00`).toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })}</h3>{selected.length ? selected.map(task => <button className="calendar-task" key={task.id} onClick={() => onSelect(task)}>{task.title}</button>) : <p className="empty">Nothing due this day.</p>}</div>}</section>
 }
 
-function Detail({ task, categories, members, user, definition, onClose, onEdit, onComplete, onDelete, demo = false }) {
+function Detail({ task, categories, members, user, definition, onClose, onEdit, onComplete, onDelete }) {
   const [comments, setComments] = useState([])
   const [subtasks, setSubtasks] = useState([])
   const [activity, setActivity] = useState([])
@@ -188,9 +184,9 @@ function Detail({ task, categories, members, user, definition, onClose, onEdit, 
   const [showCompletion, setShowCompletion] = useState(false)
   const [completion, setCompletion] = useState({ date: '', completed_by_uid: user.uid })
 
-  useEffect(() => demo ? undefined : onSnapshot(collection(db, 'tasks', task.id, 'comments'), snapshot => setComments(snapshot.docs.map(item => ({ id: item.id, ...item.data() })).sort((a, b) => (a.created_at?.seconds || 0) - (b.created_at?.seconds || 0)))), [demo, task.id])
-  useEffect(() => demo ? undefined : onSnapshot(collection(db, 'tasks', task.id, 'subtasks'), snapshot => setSubtasks(snapshot.docs.map(item => ({ id: item.id, ...item.data() })))), [demo, task.id])
-  useEffect(() => demo ? undefined : onSnapshot(collection(db, 'tasks', task.id, 'activity'), snapshot => setActivity(snapshot.docs.map(item => ({ id: item.id, ...item.data() })).sort((a, b) => (b.created_at?.seconds || 0) - (a.created_at?.seconds || 0)))), [demo, task.id])
+  useEffect(() => onSnapshot(collection(db, 'tasks', task.id, 'comments'), snapshot => setComments(snapshot.docs.map(item => ({ id: item.id, ...item.data() })).sort((a, b) => (a.created_at?.seconds || 0) - (b.created_at?.seconds || 0)))), [task.id])
+  useEffect(() => onSnapshot(collection(db, 'tasks', task.id, 'subtasks'), snapshot => setSubtasks(snapshot.docs.map(item => ({ id: item.id, ...item.data() })))), [task.id])
+  useEffect(() => onSnapshot(collection(db, 'tasks', task.id, 'activity'), snapshot => setActivity(snapshot.docs.map(item => ({ id: item.id, ...item.data() })).sort((a, b) => (b.created_at?.seconds || 0) - (a.created_at?.seconds || 0)))), [task.id])
 
   async function perform(name, action) {
     setActionError('')
@@ -206,23 +202,22 @@ function Detail({ task, categories, members, user, definition, onClose, onEdit, 
     const saved = await perform('complete task', () => onComplete(completion))
     if (saved) setShowCompletion(false)
   }
-  async function addComment(event) { event.preventDefault(); if (!comment.trim() || demo) return; await perform('add comment', async () => { await addDoc(collection(db, 'tasks', task.id, 'comments'), { body: comment.trim(), author_uid: user.uid, author_name: user.member.display_name, created_at: serverTimestamp() }); setComment('') }) }
-  async function addSubtask(event) { event.preventDefault(); if (!subtask.trim() || demo) return; await perform('add subtask', async () => { await addDoc(collection(db, 'tasks', task.id, 'subtasks'), { title: subtask.trim(), completed: false, created_at: serverTimestamp(), updated_at: serverTimestamp() }); setSubtask('') }) }
+  async function addComment(event) { event.preventDefault(); if (!comment.trim()) return; await perform('add comment', async () => { await addDoc(collection(db, 'tasks', task.id, 'comments'), { body: comment.trim(), author_uid: user.uid, author_name: user.member.display_name, created_at: serverTimestamp() }); setComment('') }) }
+  async function addSubtask(event) { event.preventDefault(); if (!subtask.trim()) return; await perform('add subtask', async () => { await addDoc(collection(db, 'tasks', task.id, 'subtasks'), { title: subtask.trim(), completed: false, created_at: serverTimestamp(), updated_at: serverTimestamp() }); setSubtask('') }) }
   const category = categories.find(item => item.id === task.category_id)?.name
   const lastCompleted = completionLabel(definition?.last_completed_at)
   const completedBy = task.completed_by_name || members.find(member => member.id === task.completed_by_uid)?.display_name
   const statusDetail = task.recurring_definition_id ? 'Recurring' : isHomeCategory(category) ? '' : label(task.status)
 
-  return <div className="modal-backdrop" role="presentation"><section className="modal" role="dialog" aria-modal="true" aria-label="Task details"><button className="close" onClick={onClose} aria-label="Close">×</button><p className="eyebrow">{category || 'Uncategorized'}</p><h2>{task.title}</h2><p>{task.description || 'No notes yet.'}</p><p className="meta">{[statusDetail, label(task.priority), task.due_date ? `Due ${task.due_date}` : ''].filter(Boolean).join(' · ')}</p>{task.status === 'completed' && <p className="completion-detail">Completed {completionLabel(task.completed_at)}{completedBy ? ` by ${completedBy}` : ''}</p>}{definition && <p className="recurrence-detail">{scheduleLabel(definition.schedule)}{lastCompleted ? ` · Last completed: ${lastCompleted}` : ' · No completions yet'}</p>}{actionError && <p className="error" role="alert">{actionError}</p>}<div className="actions"><button className="quiet" onClick={onEdit} disabled={busy}>Edit</button>{task.status !== 'completed' && <button onClick={() => setShowCompletion(true)} disabled={busy}>Complete</button>}<button className="danger" onClick={() => perform('delete task', onDelete)} disabled={busy}>Delete</button></div>{showCompletion && <form className="completion-form" onSubmit={submitCompletion}><h3>Complete task</h3><label>Completed on<input type="date" max={dateString()} value={completion.date} onChange={event => setCompletion(current => ({ ...current, date: event.target.value }))} required /></label><label>Completed by<select value={completion.completed_by_uid} onChange={event => setCompletion(current => ({ ...current, completed_by_uid: event.target.value }))}>{members.map(member => <option value={member.id} key={member.id}>{member.display_name}</option>)}</select></label><div className="actions"><button type="button" className="quiet" onClick={() => setShowCompletion(false)} disabled={busy}>Cancel</button><button disabled={busy}>{busy === 'complete task' ? 'Completing…' : 'Save completion'}</button></div></form>}{demo ? <p className="demo-note">Comments and subtasks are disabled in the isolated judge demo.</p> : <><h3>Subtasks</h3>{subtasks.map(item => <div className="subtask" key={item.id}><input type="checkbox" checked={item.completed} onChange={() => perform('update subtask', () => updateDoc(doc(db, 'tasks', task.id, 'subtasks', item.id), { completed: !item.completed, updated_at: serverTimestamp() }))} /><span>{item.title}</span><button className="text-button" onClick={() => confirm('Delete this subtask?') && perform('delete subtask', () => deleteDoc(doc(db, 'tasks', task.id, 'subtasks', item.id)))}>Delete</button></div>)}<form className="inline-form" onSubmit={addSubtask}><input value={subtask} onChange={event => setSubtask(event.target.value)} placeholder="Add a subtask" /><button disabled={busy}>Add</button></form><h3>Comments</h3>{comments.map(item => <article className="comment" key={item.id}><b>{item.author_name}</b><small>{timestampLabel(item.created_at)}</small><p>{item.body}</p><button className="text-button" onClick={() => confirm('Delete this comment?') && perform('delete comment', () => deleteDoc(doc(db, 'tasks', task.id, 'comments', item.id)))}>Delete</button></article>)}<form className="inline-form" onSubmit={addComment}><input value={comment} onChange={event => setComment(event.target.value)} placeholder="Write a comment" /><button disabled={busy}>Send</button></form><h3>Activity</h3>{activity.slice(0, 8).map(item => <p className="activity" key={item.id}>{item.message} <small>{timestampLabel(item.created_at)}</small></p>)}</>}</section></div>
+  return <div className="modal-backdrop" role="presentation"><section className="modal" role="dialog" aria-modal="true" aria-label="Task details"><button className="close" onClick={onClose} aria-label="Close">×</button><p className="eyebrow">{category || 'Uncategorized'}</p><h2>{task.title}</h2><p>{task.description || 'No notes yet.'}</p><p className="meta">{[statusDetail, label(task.priority), task.due_date ? `Due ${task.due_date}` : ''].filter(Boolean).join(' · ')}</p>{task.status === 'completed' && <p className="completion-detail">Completed {completionLabel(task.completed_at)}{completedBy ? ` by ${completedBy}` : ''}</p>}{definition && <p className="recurrence-detail">{scheduleLabel(definition.schedule)}{lastCompleted ? ` · Last completed: ${lastCompleted}` : ' · No completions yet'}</p>}{actionError && <p className="error" role="alert">{actionError}</p>}<div className="actions"><button className="quiet" onClick={onEdit} disabled={busy}>Edit</button>{task.status !== 'completed' && <button onClick={() => setShowCompletion(true)} disabled={busy}>Complete</button>}<button className="danger" onClick={() => perform('delete task', onDelete)} disabled={busy}>Delete</button></div>{showCompletion && <form className="completion-form" onSubmit={submitCompletion}><h3>Complete task</h3><label>Completed on<input type="date" max={dateString()} value={completion.date} onChange={event => setCompletion(current => ({ ...current, date: event.target.value }))} required /></label><label>Completed by<select value={completion.completed_by_uid} onChange={event => setCompletion(current => ({ ...current, completed_by_uid: event.target.value }))}>{members.map(member => <option value={member.id} key={member.id}>{member.display_name}</option>)}</select></label><div className="actions"><button type="button" className="quiet" onClick={() => setShowCompletion(false)} disabled={busy}>Cancel</button><button disabled={busy}>{busy === 'complete task' ? 'Completing…' : 'Save completion'}</button></div></form>}<h3>Subtasks</h3>{subtasks.map(item => <div className="subtask" key={item.id}><input type="checkbox" checked={item.completed} onChange={() => perform('update subtask', () => updateDoc(doc(db, 'tasks', task.id, 'subtasks', item.id), { completed: !item.completed, updated_at: serverTimestamp() }))} /><span>{item.title}</span><button className="text-button" onClick={() => confirm('Delete this subtask?') && perform('delete subtask', () => deleteDoc(doc(db, 'tasks', task.id, 'subtasks', item.id)))}>Delete</button></div>)}<form className="inline-form" onSubmit={addSubtask}><input value={subtask} onChange={event => setSubtask(event.target.value)} placeholder="Add a subtask" /><button disabled={busy}>Add</button></form><h3>Comments</h3>{comments.map(item => <article className="comment" key={item.id}><b>{item.author_name}</b><small>{timestampLabel(item.created_at)}</small><p>{item.body}</p><button className="text-button" onClick={() => confirm('Delete this comment?') && perform('delete comment', () => deleteDoc(doc(db, 'tasks', task.id, 'comments', item.id)))}>Delete</button></article>)}<form className="inline-form" onSubmit={addComment}><input value={comment} onChange={event => setComment(event.target.value)} placeholder="Write a comment" /><button disabled={busy}>Send</button></form><h3>Activity</h3>{activity.slice(0, 8).map(item => <p className="activity" key={item.id}>{item.message} <small>{timestampLabel(item.created_at)}</small></p>)}</section></div>
 }
 
 function App() {
-  const [demoMode, setDemoMode] = useState(demoBootActive)
-  const [user, setUser] = useState(() => demoBootActive ? demoUser : null)
-  const [tasks, setTasks] = useState(() => demoBootWorkspace?.tasks || [])
-  const [definitions, setDefinitions] = useState(() => demoBootWorkspace?.definitions || [])
-  const [categories, setCategories] = useState(() => demoBootWorkspace?.categories || [])
-  const [members, setMembers] = useState(() => demoBootWorkspace?.members || [])
+  const [user, setUser] = useState(null)
+  const [tasks, setTasks] = useState([])
+  const [definitions, setDefinitions] = useState([])
+  const [categories, setCategories] = useState([])
+  const [members, setMembers] = useState([])
   const [view, setView] = useState('my')
   const [modal, setModal] = useState(null)
   const [filters, setFilters] = useState({ category: '', priority: '', status: '' })
@@ -249,14 +244,14 @@ function App() {
   }, [darkMode, themePreference])
 
   useEffect(() => {
-    if (!firebaseEnabled || demoMode) return
+    if (!firebaseEnabled) return
     let unsubscribe
     authReady.then(() => { unsubscribe = onAuthStateChanged(auth, async account => { if (!account) return setUser(null); const member = await getDoc(doc(db, 'members', account.uid)); setUser(member.exists() && member.data().active ? { ...account, member: member.data() } : { ...account, denied: true }) }) })
     return () => unsubscribe?.()
-  }, [demoMode])
+  }, [])
 
   useEffect(() => {
-    if (!user?.member || user.demo) return
+    if (!user?.member) return
     const householdId = user.member.household_id
     const ownTasks = new Map(), assignedTasks = new Map(), ownDefinitions = new Map(), assignedDefinitions = new Map()
     const syncTasks = () => setTasks([...ownTasks.values(), ...assignedTasks.values()].filter((task, index, list) => list.findIndex(item => item.id === task.id) === index))
@@ -271,12 +266,7 @@ function App() {
       onSnapshot(query(collection(db, 'members'), where('household_id', '==', householdId)), snapshot => setMembers(snapshot.docs.map(item => ({ id: item.id, ...item.data() })).filter(member => member.active))),
     ]
     return () => stops.forEach(stop => stop())
-  }, [user?.demo, user?.member, user?.uid])
-
-  useEffect(() => {
-    if (!demoMode) return
-    saveDemoWorkspace({ tasks, definitions, categories, members })
-  }, [categories, definitions, demoMode, members, tasks])
+  }, [user?.member, user?.uid])
 
   useEffect(() => {
     if (!user?.member) { webmcpRuntime.current = null; return }
@@ -345,22 +335,6 @@ function App() {
     const categoryIsHome = isHomeCategory(categories.find(category => category.id === data.category_id)?.name || '')
     const taskStatus = existing?.status === 'completed' ? 'completed' : schedule.frequency || categoryIsHome ? 'not_started' : data.status
     const base = { household_id: user.member.household_id, title: data.title.trim(), description: data.description.trim(), category_id: data.category_id || '', status: taskStatus, priority: data.priority, due_date: data.due_date || null, due_time: null, assignment_type, assignee_uids: assignees, recurrence: schedule, updated_at: serverTimestamp() }
-    if (demoMode) {
-      const savedId = existing?.id || `demo-${crypto.randomUUID()}`
-      const demoBase = { ...base, updated_at: new Date().toISOString() }
-      if (!existing) {
-        const definitionId = schedule.frequency ? `demo-repeat-${crypto.randomUUID()}` : null
-        const created = { ...demoBase, id: savedId, created_by_uid: user.uid, created_by_name: user.member.display_name, created_at: new Date().toISOString(), completed_at: null, completed_by_uid: null, completed_by_name: null, recurrence_key: definitionId || savedId, recurring_definition_id: definitionId, occurrence_due_date: definitionId ? demoBase.due_date : null }
-        setTasks(current => [...current, created])
-        if (definitionId) setDefinitions(current => [...current, { ...demoBase, id: definitionId, schedule, active: true, next_due_date: demoBase.due_date, current_occurrence_id: savedId, last_completed_at: null, last_completed_occurrence_id: null, created_by_uid: user.uid, created_by_name: user.member.display_name, created_at: new Date().toISOString() }])
-      } else {
-        const demoCompletion = existing.status === 'completed' ? { completed_at: data.completion_date ? `${data.completion_date}T12:00:00` : existing.completed_at, completed_by_uid: data.completed_by_uid, completed_by_name: members.find(member => member.id === data.completed_by_uid)?.display_name || existing.completed_by_name } : {}
-        setTasks(current => current.map(task => task.id === existing.id ? { ...task, ...demoBase, ...demoCompletion } : task))
-      }
-      setError('')
-      setModal(null)
-      return savedId
-    }
     try {
       let savedId = existing?.id || null
       if (!existing) {
@@ -402,21 +376,6 @@ function App() {
     const completedBy = members.find(member => member.id === completion.completed_by_uid)
     if (!completedBy) throw new Error('Choose who completed the task.')
     const completedAt = completionTimestamp(completion.date)
-    if (demoMode) {
-      const completedAtString = `${completion.date}T12:00:00`
-      const definition = task.recurring_definition_id ? definitions.find(item => item.id === task.recurring_definition_id) : null
-      const candidateDate = definition ? nextDueDate(completion.date, definition.schedule) : null
-      const nextDate = candidateDate && (!definition.schedule.end_date || candidateDate <= definition.schedule.end_date) ? candidateDate : null
-      const nextId = nextDate ? occurrenceId(task.recurring_definition_id, nextDate) : null
-      setTasks(current => {
-        const completed = current.map(item => item.id === task.id ? { ...item, status: 'completed', completed_at: completedAtString, completed_by_uid: completedBy.id, completed_by_name: completedBy.display_name, updated_at: new Date().toISOString() } : item)
-        if (!definition || !nextDate || completed.some(item => item.id === nextId)) return completed
-        return [...completed, { household_id: definition.household_id, id: nextId, title: definition.title, description: definition.description, category_id: definition.category_id, status: 'not_started', priority: definition.priority, due_date: nextDate, due_time: null, assignment_type: assignmentType(definition), assignee_uids: definition.assignee_uids, created_by_uid: definition.created_by_uid, created_by_name: definition.created_by_name, created_at: new Date().toISOString(), updated_at: new Date().toISOString(), completed_at: null, completed_by_uid: null, completed_by_name: null, recurrence: definition.schedule, recurrence_key: task.recurring_definition_id, recurring_definition_id: task.recurring_definition_id, occurrence_due_date: nextDate }]
-      })
-      if (definition) setDefinitions(current => current.map(item => item.id === definition.id ? { ...item, last_completed_at: completedAtString, last_completed_occurrence_id: task.id, next_due_date: nextDate, current_occurrence_id: nextId, active: Boolean(nextDate), updated_at: new Date().toISOString() } : item))
-      setModal(null)
-      return task.id
-    }
     try {
       await runTransaction(db, async transaction => {
         const taskRef = doc(db, 'tasks', task.id), taskSnapshot = await transaction.get(taskRef)
@@ -448,26 +407,13 @@ function App() {
 
   async function removeTask(task) {
     if (!confirm(`Delete “${task.title}”? This cannot be undone.`)) return
-    if (demoMode) { setTasks(current => current.filter(item => item.id !== task.id)); setModal(null); return }
     try { await deleteDoc(doc(db, 'tasks', task.id)); setModal(null) }
     catch (failure) { const message = mutationMessage(failure, 'delete task'); setError(message); throw new Error(message) }
   }
-  async function seedCategories() { if (!confirm('Add the five household categories? Existing categories will stay unchanged.')) return; if (demoMode) { setCategories(current => [...current, ...categoriesSeed.filter(name => !current.some(category => category.name === name)).map((name, index) => ({ id: `demo-category-${crypto.randomUUID()}`, household_id: 'webmcp-demo', name, position: current.length + index, archived: false, visible_to_uids: members.map(member => member.id) }))]); return } for (const [position, name] of categoriesSeed.entries()) await addDoc(collection(db, 'categories'), { household_id: user.member.household_id, name, position: categories.length + position, archived: false, visible_to_uids: members.map(member => member.id), created_at: serverTimestamp(), updated_at: serverTimestamp() }) }
-  async function addCategory() { const name = prompt('Category name'); if (!name?.trim()) return; if (demoMode) { setCategories(current => [...current, { id: `demo-category-${crypto.randomUUID()}`, household_id: 'webmcp-demo', name: name.trim(), position: current.filter(category => !category.archived).length, archived: false, visible_to_uids: [user.uid] }]); return } await addDoc(collection(db, 'categories'), { household_id: user.member.household_id, name: name.trim(), position: categories.filter(category => !category.archived).length, archived: false, visible_to_uids: [user.uid], created_at: serverTimestamp(), updated_at: serverTimestamp() }) }
+  async function seedCategories() { if (!confirm('Add the five household categories? Existing categories will stay unchanged.')) return; for (const [position, name] of categoriesSeed.entries()) await addDoc(collection(db, 'categories'), { household_id: user.member.household_id, name, position: categories.length + position, archived: false, visible_to_uids: members.map(member => member.id), created_at: serverTimestamp(), updated_at: serverTimestamp() }) }
+  async function addCategory() { const name = prompt('Category name'); if (!name?.trim()) return; await addDoc(collection(db, 'categories'), { household_id: user.member.household_id, name: name.trim(), position: categories.filter(category => !category.archived).length, archived: false, visible_to_uids: [user.uid], created_at: serverTimestamp(), updated_at: serverTimestamp() }) }
   async function manageCategory(category, action) {
     const active = categories.filter(item => !item.archived && categoryVisibleTo(item, user.uid))
-    if (demoMode) {
-      if (action === 'rename') {
-        const name = prompt('Category name', category.name)
-        if (name?.trim()) setCategories(current => current.map(item => item.id === category.id ? { ...item, name: name.trim() } : item))
-      } else if (action === 'archive') {
-        if (confirm(`Archive ${category.name}?`)) setCategories(current => current.map(item => item.id === category.id ? { ...item, archived: true } : item))
-      } else {
-        const neighbor = active[active.indexOf(category) + action]
-        if (neighbor) setCategories(current => current.map(item => item.id === category.id ? { ...item, position: neighbor.position } : item.id === neighbor.id ? { ...item, position: category.position } : item))
-      }
-      return
-    }
     if (action === 'rename') {
       const name = prompt('Category name', category.name)
       if (name?.trim()) await updateDoc(doc(db, 'categories', category.id), { name: name.trim(), updated_at: serverTimestamp() })
@@ -482,41 +428,7 @@ function App() {
     }
   }
 
-  function enterDemo() {
-    const workspace = loadDemoWorkspace()
-    localStorage.setItem(DEMO_ACTIVE_KEY, 'true')
-    setDemoMode(true)
-    setUser(demoUser)
-    setTasks(workspace.tasks)
-    setDefinitions(workspace.definitions)
-    setCategories(workspace.categories)
-    setMembers(workspace.members)
-    setView('my')
-    setModal(null)
-  }
-
-  function resetDemo() {
-    const workspace = freshDemoWorkspace()
-    saveDemoWorkspace(workspace)
-    setTasks(workspace.tasks)
-    setDefinitions(workspace.definitions)
-    setCategories(workspace.categories)
-    setMembers(workspace.members)
-    setSelectedTaskIds([])
-    setAgentNotice('Demo workspace reset.')
-  }
-
   function leaveWorkspace() {
-    if (demoMode) {
-      localStorage.removeItem(DEMO_ACTIVE_KEY)
-      setDemoMode(false)
-      setUser(null)
-      setTasks([])
-      setDefinitions([])
-      setCategories([])
-      setMembers([])
-      return
-    }
     signOut(auth)
   }
 
@@ -584,8 +496,8 @@ function App() {
     return toolResult(message, { updated })
   }
 
-  if (!firebaseEnabled && !demoMode) return <main className="login"><div><h1>Firebase is not configured</h1><p>You can still explore the isolated challenge demo.</p><button onClick={enterDemo}>Open demo workspace</button></div></main>
-  if (!user) return <Login onDemo={enterDemo} />
+  if (!firebaseEnabled) return <main className="login"><div><h1>Firebase is not configured</h1><p>Add the required Firebase environment variables before starting the app.</p></div></main>
+  if (!user) return <Login />
   if (user.denied) return <main className="login"><h1>Access not approved</h1><p>Your signed-in account is not an active household member.</p><button onClick={() => signOut(auth)}>Sign out</button></main>
 
   const { counterpart, visibleCategories, activeCategories, categoryName, toolbarCategories, activeTasks } = deriveWorkspaceView({ tasks, categories, members, user, view, filters })
@@ -604,18 +516,18 @@ function App() {
     return <article className={`task${isSelected ? ' task-selected' : ''}${recurring ? ' recurring-card' : ''}${urgency}`} aria-selected={isSelected} key={task.id} onClick={() => setModal({ type: 'detail', task })}><label className="task-select" onClick={event => event.stopPropagation()}><input type="checkbox" checked={isSelected} onChange={() => setSelectedTaskIds(current => current.includes(task.id) ? current.filter(id => id !== task.id) : [...current, task.id])} aria-label={`Select ${task.title}`} /><span aria-hidden="true" /></label><span className={`priority ${task.priority}`} /><div><h2>{task.title}</h2><p>{taskCategory || 'Uncategorized'}{detail && ` · ${detail}`}</p>{recurring && <small>{lastCompleted ? `Last completed: ${lastCompleted}` : 'No completions yet'}</small>}</div><time>{dueLabel(task.due_date)}</time></article>
   }
   return <main>
-    <header><h1><img className="brand-flame" src="/taskappflame-transparent.png" alt="" aria-hidden="true" />Tasks{demoMode && <span className="demo-badge">Agent demo</span>}</h1><div className="header-actions"><button className="theme-toggle" onClick={() => setThemePreference(darkMode ? 'light' : 'dark')} aria-label={`Use ${darkMode ? 'light' : 'dark'} mode`} title={`Theme: ${themePreference}`}><span aria-hidden="true">{darkMode ? '☾' : '☼'}</span></button><button className="quick-add" onClick={() => setModal({ type: 'new' })} aria-label="Add task">+</button></div></header>
+    <header><h1><img className="brand-flame" src="/taskappflame-transparent.png" alt="" aria-hidden="true" />Tasks</h1><div className="header-actions"><button className="theme-toggle" onClick={() => setThemePreference(darkMode ? 'light' : 'dark')} aria-label={`Use ${darkMode ? 'light' : 'dark'} mode`} title={`Theme: ${themePreference}`}><span aria-hidden="true">{darkMode ? '☾' : '☼'}</span></button><button className="quick-add" onClick={() => setModal({ type: 'new' })} aria-label="Add task">+</button></div></header>
     <nav>{nav.map(([id, name]) => <button className={view === id ? 'active' : ''} onClick={() => { setView(id); setFilters({ category: '', priority: '', status: '' }); setSelectedTaskIds([]) }} key={id}>{name}</button>)}</nav>
     {error && <p className="error" role="alert">{error}</p>}
     {agentNotice && <div className="agent-notice" role="status"><img src="/taskappflame-transparent.png" alt="" aria-hidden="true" /><span>{agentNotice}</span><button onClick={() => setAgentNotice('')} aria-label="Dismiss agent update">×</button></div>}
     {view !== 'completed' && <section className="toolbar"><select value={filters.category} onChange={event => setFilters({ ...filters, category: event.target.value })}><option value="">All categories</option>{toolbarCategories.map(category => <option value={category.id} key={category.id}>{category.name}</option>)}</select><select value={filters.priority} onChange={event => setFilters({ ...filters, priority: event.target.value })}><option value="">All priorities</option>{['high', 'medium', 'low'].map(item => <option key={item} value={item}>{label(item)}</option>)}</select>{view !== 'home' && <select value={filters.status} onChange={event => setFilters({ ...filters, status: event.target.value })}><option value="">All active statuses</option>{['not_started', 'in_progress', 'waiting'].map(item => <option key={item} value={item}>{label(item)}</option>)}</select>}{!activeCategories.length && <button className="quiet" onClick={seedCategories}>Seed categories</button>}</section>}
     {activeSelectedTaskIds.length > 0 && <section className="selection-bar" aria-live="polite"><span>{activeSelectedTaskIds.length} selected</span><small>Ask your agent to update “these tasks.”</small><button className="text-button" onClick={() => setSelectedTaskIds([])}>Clear</button></section>}
     {view === 'calendar' ? <Calendar tasks={activeTasks} onSelect={task => setModal({ type: 'detail', task })} /> : <section className="task-list">{activeTasks.map(taskCard)}{!activeTasks.length && <p className="empty">Nothing here yet.</p>}</section>}
-    <footer className="settings"><button className="text-button" onClick={() => setModal({ type: 'settings' })}>Settings</button><button className="text-button sign-out" onClick={leaveWorkspace}>{demoMode ? 'Exit demo' : 'Log out'}</button></footer>
-    {modal?.type === 'settings' && <div className="modal-backdrop"><section className="modal settings-modal"><button className="close" onClick={() => setModal(null)} aria-label="Close">×</button><h2>Settings</h2><fieldset><legend>Appearance</legend><div className="theme-options">{[['system', 'Use device setting'], ['light', 'Light'], ['dark', 'Dark']].map(([value, name]) => <label className="check" key={value}><input type="radio" name="theme" checked={themePreference === value} onChange={() => setThemePreference(value)} />{name}</label>)}</div></fieldset><button onClick={() => setModal({ type: 'categories' })}>Manage categories</button>{demoMode && <button className="quiet" onClick={resetDemo}>Reset judge demo</button>}</section></div>}
+    <footer className="settings"><button className="text-button" onClick={() => setModal({ type: 'settings' })}>Settings</button><button className="text-button sign-out" onClick={leaveWorkspace}>Log out</button></footer>
+    {modal?.type === 'settings' && <div className="modal-backdrop"><section className="modal settings-modal"><button className="close" onClick={() => setModal(null)} aria-label="Close">×</button><h2>Settings</h2><fieldset><legend>Appearance</legend><div className="theme-options">{[['system', 'Use device setting'], ['light', 'Light'], ['dark', 'Dark']].map(([value, name]) => <label className="check" key={value}><input type="radio" name="theme" checked={themePreference === value} onChange={() => setThemePreference(value)} />{name}</label>)}</div></fieldset><button onClick={() => setModal({ type: 'categories' })}>Manage categories</button></section></div>}
     {modal?.type === 'categories' && <div className="modal-backdrop"><section className="modal"><button className="close" onClick={() => setModal(null)}>×</button><h2>Categories</h2>{activeCategories.map((category, index) => <p className="category-row" key={category.id}><span>{category.name}</span><button onClick={() => manageCategory(category, -1)} disabled={!index}>↑</button><button onClick={() => manageCategory(category, 1)} disabled={index === activeCategories.length - 1}>↓</button><button onClick={() => manageCategory(category, 'rename')}>Edit</button><button onClick={() => manageCategory(category, 'archive')}>Archive</button></p>)}<button onClick={addCategory}>Add category</button></section></div>}
     {modal?.type === 'new' && <div className="modal-backdrop"><section className="modal"><button className="close" onClick={() => setModal(null)}>×</button><h2>New task</h2><TaskForm categories={activeCategories} members={members} userId={user.uid} onClose={() => setModal(null)} onSave={saveTask} /></section></div>}
-    {selected && <Detail task={selected} categories={visibleCategories} members={members} user={user} definition={selectedDefinition} demo={demoMode} onClose={() => setModal(null)} onComplete={completion => complete(selected, completion)} onDelete={() => removeTask(selected)} onEdit={() => setModal({ type: 'edit', task: selected })} />}
+    {selected && <Detail task={selected} categories={visibleCategories} members={members} user={user} definition={selectedDefinition} onClose={() => setModal(null)} onComplete={completion => complete(selected, completion)} onDelete={() => removeTask(selected)} onEdit={() => setModal({ type: 'edit', task: selected })} />}
     {modal?.type === 'edit' && <div className="modal-backdrop"><section className="modal"><button className="close" onClick={() => setModal(null)}>×</button><h2>Edit task</h2><TaskForm task={modal.task} categories={activeCategories} members={members} userId={user.uid} onClose={() => setModal(null)} onSave={data => saveTask(data, modal.task)} /></section></div>}
     {webmcpDebug.enabled && <aside className="webmcp-debug"><b>WebMCP {webmcpDebug.available ? 'ready' : 'unavailable'}</b><span>{webmcpDebug.registered.length} tools</span>{webmcpDebug.lastInvocation && <small>{webmcpDebug.lastInvocation.tool}: {webmcpDebug.lastInvocation.ok ? 'ok' : webmcpDebug.lastInvocation.error}</small>}{webmcpDebug.error && <small>{webmcpDebug.error}</small>}</aside>}
   </main>
